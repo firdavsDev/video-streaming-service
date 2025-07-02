@@ -12,7 +12,7 @@ from app.api.auth import router as auth_router
 from app.api.video import router as video_router
 from app.config import settings
 from app.database import close_db, init_db
-from app.middleware.auth import AdminAuthMiddleware, CORSMiddleware
+from app.middleware.auth import AdminAuthMiddleware
 from app.utils.helpers import create_directory_structure
 
 # Configure logging
@@ -77,8 +77,7 @@ app.add_middleware(
 
 # Add authentication middleware
 app.add_middleware(AdminAuthMiddleware, protected_paths=["/admin"])
-# Add custom CORS middleware
-app.add_middleware(CORSMiddleware)
+
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
