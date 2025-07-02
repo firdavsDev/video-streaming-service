@@ -1,0 +1,313 @@
+<!-- app/templates/admin/upload.html -->
+{% extends "admin/base.html" %}
+
+{% block title %}Upload Video - Video Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="bi bi-cloud-upload"></i> Upload Video
+            </h1>
+            <p class="text-muted">Upload a new video to the streaming service</p>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-body p-4">
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <!-- Video File Upload -->
+                        <div class="mb-4">
+                            <label for="videoFile" class="form-label">Video File *</label>
+                            <div class="upload-area" id="uploadArea">
+                                <div class="upload-content">
+                                    <i class="bi bi-cloud-upload text-primary" style="font-size: 3rem;"></i>
+                                    <h5 class="mt-3">Drag & Drop or Click to Upload</h5>
+                                    <p class="text-muted mb-3">
+                                        Maximum file size: {{ (max_file_size / (1024*1024))|int }} MB<br>
+                                        Supported formats: {{ allowed_types|join(', ')|upper }}
+                                    </p>
+                                    <input type="file" id="videoFile" name="file" class="d-none" 
+                                           accept=".{{ allowed_types|join(',.')  }}" required>
+                                    <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('videoFile').click()">
+                                        <i class="bi bi-folder2-open"></i> Choose File
+                                    </button>
+                                </div>
+                                <div class="upload-progress d-none">
+                                    <div class="text-center mb-3">
+                                        <i class="bi bi-file-earmark-play text-success" style="font-size: 2rem;"></i>
+                                        <h6 class="mt-2" id="fileName"></h6>
+                                        <p class="text-muted mb-0" id="fileSize"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Video Information -->
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="title" class="form-label">Video Title *</label>
+                                <input type="text" class="form-control" id="title" name="title" 
+                                       required maxlength="255" placeholder="Enter video title">
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" 
+                                    rows="4" placeholder="Enter video description (optional)"></textarea>
+                        </div>
+
+                        <!-- Upload Progress -->
+                        <div class="upload-progress-container d-none">
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-muted">Upload Progress</span>
+                                    <span class="text-muted" id="progressText">0%</span>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar" id="progressBar" role="progressbar" 
+                                         style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                <span id="statusMessage">Preparing upload...</span>
+                            </div>
+                        </div>
+
+                        <!-- Submit Buttons -->
+                        <div class="d-flex justify-content-between">
+                            <a href="/admin/dashboard" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary" id="submitBtn">
+                                <i class="bi bi-cloud-upload"></i> Upload Video
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Upload Tips -->
+            <div class="card shadow mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-lightbulb"></i> Upload Tips
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li>Videos will be processed automatically after upload</li>
+                        <li>Processing time depends on file size and duration</li>
+                        <li>You can monitor upload progress in real-time</li>
+                        <li>Thumbnails will be generated automatically</li>
+                        <li>A secure streaming link will be provided after processing</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.upload-area {
+    border: 2px dashed #dee2e6;
+    border-radius: 10px;
+    padding: 3rem 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    background-color: #f8f9fa;
+}
+
+.upload-area:hover {
+    border-color: #4e73df;
+    background-color: #f0f2ff;
+}
+
+.upload-area.dragover {
+    border-color: #4e73df;
+    background-color: #e3f2fd;
+    transform: scale(1.02);
+}
+
+.upload-area.has-file {
+    border-color: #1cc88a;
+    background-color: #f0fff4;
+}
+
+.progress {
+    height: 8px;
+    border-radius: 10px;
+}
+
+.progress-bar {
+    border-radius: 10px;
+    transition: width 0.3s ease;
+}
+
+.card {
+    border-radius: 10px;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('videoFile');
+    const uploadForm = document.getElementById('uploadForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const progressContainer = document.querySelector('.upload-progress-container');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const statusMessage = document.getElementById('statusMessage');
+
+    // Drag and drop functionality
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            handleFileSelect();
+        }
+    });
+
+    // File input change
+    fileInput.addEventListener('change', handleFileSelect);
+
+    function handleFileSelect() {
+        const file = fileInput.files[0];
+        if (file) {
+            // Validate file type
+            const allowedTypes = {{ allowed_types|tojson }};
+            const fileExtension = file.name.split('.').pop().toLowerCase();
+            
+            if (!allowedTypes.includes(fileExtension)) {
+                showToast('Invalid file type. Please select a video file.', 'error');
+                fileInput.value = '';
+                return;
+            }
+
+            // Validate file size
+            const maxSize = {{ max_file_size }};
+            if (file.size > maxSize) {
+                showToast(`File too large. Maximum size is ${Math.round(maxSize / (1024*1024))} MB.`, 'error');
+                fileInput.value = '';
+                return;
+            }
+
+            // Update UI
+            uploadArea.classList.add('has-file');
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.querySelector('.upload-content').classList.add('d-none');
+            document.querySelector('.upload-progress').classList.remove('d-none');
+
+            // Auto-fill title if empty
+            if (!document.getElementById('title').value) {
+                const fileName = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+                document.getElementById('title').value = fileName;
+            }
+        }
+    }
+
+    // Form submission
+    uploadForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('title', document.getElementById('title').value);
+        formData.append('description', document.getElementById('description').value);
+
+        // Show progress
+        progressContainer.classList.remove('d-none');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Uploading...';
+
+        try {
+            const xhr = new XMLHttpRequest();
+            
+            // Track upload progress
+            xhr.upload.addEventListener('progress', function(e) {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    progressBar.style.width = percentComplete + '%';
+                    progressBar.setAttribute('aria-valuenow', percentComplete);
+                    progressText.textContent = Math.round(percentComplete) + '%';
+                    
+                    if (percentComplete < 100) {
+                        statusMessage.innerHTML = '<i class="bi bi-upload"></i> Uploading video...';
+                    } else {
+                        statusMessage.innerHTML = '<i class="bi bi-gear"></i> Processing video...';
+                    }
+                }
+            });
+
+            // Handle response
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    const response = JSON.parse(xhr.responseText);
+                    showToast('Video uploaded successfully! Processing started.', 'success');
+                    
+                    // Redirect to video detail page after short delay
+                    setTimeout(() => {
+                        window.location.href = `/admin/video/${response.id}`;
+                    }, 2000);
+                } else {
+                    const error = JSON.parse(xhr.responseText);
+                    showToast('Upload failed: ' + error.detail, 'error');
+                    resetForm();
+                }
+            };
+
+            xhr.onerror = function() {
+                showToast('Upload failed due to network error', 'error');
+                resetForm();
+            };
+
+            // Send request
+            xhr.open('POST', '/api/v1/video/upload');
+            xhr.send(formData);
+
+        } catch (error) {
+            showToast('Upload failed: ' + error.message, 'error');
+            resetForm();
+        }
+    });
+
+    function resetForm() {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> Upload Video';
+        progressContainer.classList.add('d-none');
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+});
+</script>
+{% endblock %}

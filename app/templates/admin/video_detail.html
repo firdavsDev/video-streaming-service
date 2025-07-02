@@ -1,0 +1,656 @@
+<!-- app/templates/admin/video_detail.html -->
+{% extends "admin/base.html" %}
+
+{% block title %}{{ video.title }} - Video Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/admin/dashboard">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="/admin/videos">Videos</a></li>
+                    <li class="breadcrumb-item active">{{ video.title }}</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-0">
+                <i class="bi bi-play-circle"></i> {{ video.title }}
+            </h1>
+        </div>
+        <div class="col-auto">
+            {% if video.status.value == 'completed' %}
+            <button class="btn btn-success me-2" onclick="generateStreamingLink({{ video.id }})">
+                <i class="bi bi-link-45deg"></i> Copy Link
+            </button>
+            <button class="btn btn-info me-2" onclick="previewVideo('{{ video.unique_id }}')">
+                <i class="bi bi-play"></i> Preview
+            </button>
+            {% endif %}
+            <a href="/admin/videos" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Videos
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Video Information -->
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="bi bi-info-circle"></i> Video Information
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th width="30%">Title:</th>
+                                    <td>{{ video.title }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Original Filename:</th>
+                                    <td>{{ video.original_filename }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Description:</th>
+                                    <td>{{ video.description or 'No description provided' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                        {% if video.status.value == 'completed' %}
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-circle"></i> Completed
+                                            </span>
+                                        {% elif video.status.value == 'processing' %}
+                                            <span class="badge bg-warning">
+                                                <i class="bi bi-hourglass-split"></i> Processing
+                                            </span>
+                                            <div class="progress mt-2" style="height: 8px;">
+                                                <div class="progress-bar" style="width: {{ video.upload_progress }}%"></div>
+                                            </div>
+                                            <small class="text-muted">{{ video.upload_progress }}% complete</small>
+                                        {% elif video.status.value == 'uploading' %}
+                                            <span class="badge bg-info">
+                                                <i class="bi bi-cloud-upload"></i> Uploading
+                                            </span>
+                                        {% elif video.status.value == 'failed' %}
+                                            <span class="badge bg-danger">
+                                                <i class="bi bi-x-circle"></i> Failed
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Unique ID:</th>
+                                    <td>
+                                        <code>{{ video.unique_id }}</code>
+                                        <button class="btn btn-sm btn-outline-secondary ms-2" 
+                                                onclick="copyToClipboard('{{ video.unique_id }}')">
+                                            <i class="bi bi-clipboard"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% if video.file_size %}
+                                <tr>
+                                    <th>File Size:</th>
+                                    <td>{{ "%.1f"|format(video.file_size / (1024*1024)) }} MB</td>
+                                </tr>
+                                {% endif %}
+                                {% if video.duration %}
+                                <tr>
+                                    <th>Duration:</th>
+                                    <td>
+                                        {% set hours = video.duration // 3600 %}
+                                        {% set minutes = (video.duration % 3600) // 60 %}
+                                        {% set seconds = video.duration % 60 %}
+                                        {{ "%02d:%02d:%02d"|format(hours, minutes, seconds) }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% if video.resolution %}
+                                <tr>
+                                    <th>Resolution:</th>
+                                    <td>{{ video.resolution }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if video.format %}
+                                <tr>
+                                    <th>Format:</th>
+                                    <td>{{ video.format|upper }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <th>Created:</th>
+                                    <td>{{ video.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                </tr>
+                                {% if video.completed_at %}
+                                <tr>
+                                    <th>Completed:</th>
+                                    <td>{{ video.completed_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            {% if video.thumbnail_path %}
+                            <img src="/api/v1/video/thumbnail/{{ video.id }}" 
+                                 alt="Video Thumbnail" 
+                                 class="img-fluid rounded shadow-sm"
+                                 style="max-height: 200px;">
+                            {% else %}
+                            <div class="thumbnail-placeholder-large">
+                                <i class="bi bi-play-circle text-muted" style="font-size: 4rem;"></i>
+                                <p class="text-muted mt-2">No thumbnail available</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Streaming Information -->
+            {% if video.status.value == 'completed' %}
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="bi bi-broadcast"></i> Streaming Information
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        Use the streaming link below to embed this video in your React application.
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Streaming URL:</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" 
+                                   id="streamingUrl" 
+                                   value="{{ api_base }}/video/stream/{{ video.unique_id }}" 
+                                   readonly>
+                            <button class="btn btn-outline-secondary" 
+                                    onclick="copyToClipboard(document.getElementById('streamingUrl').value)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Note: This URL requires a valid token for access.</small>
+                    </div>
+
+                    {% if streaming_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Temporary Access URL (1 hour):</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" 
+                                   id="temporaryUrl" 
+                                   value="{{ api_base }}/video/stream/{{ video.unique_id }}?token={{ streaming_token }}" 
+                                   readonly>
+                            <button class="btn btn-outline-secondary" 
+                                    onclick="copyToClipboard(document.getElementById('temporaryUrl').value)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">This URL includes a temporary token and will expire in 1 hour.</small>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" onclick="generateNewToken()">
+                            <i class="bi bi-arrow-clockwise"></i> Generate New Token
+                        </button>
+                        <button class="btn btn-success" onclick="previewVideo('{{ video.unique_id }}')">
+                            <i class="bi bi-play"></i> Test Playback
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Processing Log -->
+            {% if video.processing_log or video.error_message %}
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="bi bi-file-text"></i> Processing Log
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% if video.error_message %}
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Error:</strong> {{ video.error_message }}
+                    </div>
+                    {% endif %}
+                    
+                    {% if video.processing_log %}
+                    <pre class="bg-light p-3 rounded" style="max-height: 300px; overflow-y: auto;">{{ video.processing_log }}</pre>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Actions Panel -->
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="bi bi-gear"></i> Actions
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% if video.status.value == 'completed' %}
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-success" onclick="generateStreamingLink({{ video.id }})">
+                            <i class="bi bi-link-45deg"></i> Copy Streaming Link
+                        </button>
+                        <button class="btn btn-info" onclick="previewVideo('{{ video.unique_id }}')">
+                            <i class="bi bi-play"></i> Preview Video
+                        </button>
+                        <button class="btn btn-primary" onclick="showEmbedCode()">
+                            <i class="bi bi-code-square"></i> Get Embed Code
+                        </button>
+                        <hr>
+                        <button class="btn btn-outline-warning" onclick="showEditForm()">
+                            <i class="bi bi-pencil"></i> Edit Details
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="confirmDelete({{ video.id }}, '{{ video.title }}')">
+                            <i class="bi bi-trash"></i> Delete Video
+                        </button>
+                    </div>
+                    {% elif video.status.value in ['processing', 'uploading'] %}
+                    <div class="text-center">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Processing...</span>
+                        </div>
+                        <p class="text-muted">Video is being processed...</p>
+                        <button class="btn btn-outline-primary" onclick="checkProgress()">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh Status
+                        </button>
+                    </div>
+                    {% elif video.status.value == 'failed' %}
+                    <div class="text-center">
+                        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 3rem;"></i>
+                        <h5 class="text-danger mt-2">Processing Failed</h5>
+                        <p class="text-muted">The video processing encountered an error.</p>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-warning" onclick="retryProcessing()">
+                                <i class="bi bi-arrow-clockwise"></i> Retry Processing
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="confirmDelete({{ video.id }}, '{{ video.title }}')">
+                                <i class="bi bi-trash"></i> Delete Video
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Video Statistics -->
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="bi bi-bar-chart"></i> Statistics
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <h4 class="text-primary">{{ video.upload_progress }}%</h4>
+                                <small class="text-muted">Progress</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <h4 class="text-info">
+                                {% if video.file_size %}
+                                {{ "%.0f"|format(video.file_size / (1024*1024)) }}
+                                {% else %}
+                                0
+                                {% endif %}
+                            </h4>
+                            <small class="text-muted">MB</small>
+                        </div>
+                    </div>
+                    
+                    {% if video.duration %}
+                    <hr>
+                    <div class="text-center">
+                        <h5 class="text-success">
+                            {% set hours = video.duration // 3600 %}
+                            {% set minutes = (video.duration % 3600) // 60 %}
+                            {% set seconds = video.duration % 60 %}
+                            {{ "%02d:%02d:%02d"|format(hours, minutes, seconds) }}
+                        </h5>
+                        <small class="text-muted">Duration</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Video Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-play-circle"></i> {{ video.title }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <video id="previewVideo" class="w-100" controls style="max-height: 70vh;">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Embed Code Modal -->
+<div class="modal fade" id="embedModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-code-square"></i> Embed Code
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Use this code to embed the video in your React application:</p>
+                
+                <div class="mb-3">
+                    <label class="form-label">React Component:</label>
+                    <pre class="bg-light p-3 rounded"><code id="reactCode">// Loading...</code></pre>
+                    <button class="btn btn-sm btn-outline-primary" onclick="copyReactCode()">
+                        <i class="bi bi-clipboard"></i> Copy React Code
+                    </button>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">HTML5 Video Tag:</label>
+                    <pre class="bg-light p-3 rounded"><code id="htmlCode"><!-- Loading... --></code></pre>
+                    <button class="btn btn-sm btn-outline-primary" onclick="copyHtmlCode()">
+                        <i class="bi bi-clipboard"></i> Copy HTML Code
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Video Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil"></i> Edit Video Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="editTitle" class="form-label">Title</label>
+                        <input type="text" class="form-control" id="editTitle" value="{{ video.title }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="editDescription" rows="4">{{ video.description or '' }}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle text-warning"></i> Confirm Delete
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete "<strong>{{ video.title }}</strong>"?</p>
+                <p class="text-muted small">This action cannot be undone. The video file and all associated data will be permanently removed.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="/admin/video/{{ video.id }}/delete" method="post" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Delete Video
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.thumbnail-placeholder-large {
+    width: 100%;
+    max-width: 200px;
+    height: 150px;
+    background-color: #f8f9fc;
+    border: 2px dashed #d1d3e2;
+    border-radius: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+}
+
+pre code {
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.table-borderless td, .table-borderless th {
+    border: none;
+    padding: 0.5rem 0;
+}
+</style>
+
+<script>
+const videoId = {{ video.id }};
+const videoUniqueId = '{{ video.unique_id }}';
+const apiBase = '{{ api_base }}';
+
+async function generateStreamingLink(videoId) {
+    try {
+        const response = await fetch(`${apiBase}/video/${videoId}/generate-token`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getAuthToken()}`
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            await copyToClipboard(data.streaming_url);
+            showToast('Streaming link copied to clipboard!', 'success');
+        } else {
+            showToast('Failed to generate streaming link', 'error');
+        }
+    } catch (error) {
+        showToast('Error generating streaming link', 'error');
+    }
+}
+
+async function generateNewToken() {
+    try {
+        const response = await fetch(`${apiBase}/video/${videoId}/generate-token`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getAuthToken()}`
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('temporaryUrl').value = data.streaming_url;
+            showToast('New token generated successfully!', 'success');
+        } else {
+            showToast('Failed to generate new token', 'error');
+        }
+    } catch (error) {
+        showToast('Error generating new token', 'error');
+    }
+}
+
+function previewVideo(uniqueId) {
+    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+    const videoElement = document.getElementById('previewVideo');
+    
+    // Use the streaming URL with current auth
+    videoElement.src = `${apiBase}/video/stream/${uniqueId}`;
+    modal.show();
+}
+
+function showEmbedCode() {
+    const modal = new bootstrap.Modal(document.getElementById('embedModal'));
+    
+    // Generate React code
+    const reactCode = `import React from 'react';
+
+const VideoPlayer = ({ videoId, authToken }) => {
+  return (
+    <video 
+      controls 
+      width="100%" 
+      style={{ maxWidth: '800px' }}
+    >
+      <source 
+        src={\`${apiBase}/video/stream/\${videoId}?token=\${authToken}\`} 
+        type="video/mp4" 
+      />
+      Your browser does not support the video tag.
+    </video>
+  );
+};
+
+// Usage:
+// <VideoPlayer videoId="${videoUniqueId}" authToken={yourAuthToken} />`;
+
+    // Generate HTML code
+    const htmlCode = `<video controls width="100%" style="max-width: 800px;">
+  <source src="${apiBase}/video/stream/${videoUniqueId}?token=YOUR_TOKEN" type="video/mp4">
+  Your browser does not support the video tag.
+</video>`;
+
+    document.getElementById('reactCode').textContent = reactCode;
+    document.getElementById('htmlCode').textContent = htmlCode;
+    
+    modal.show();
+}
+
+function copyReactCode() {
+    const code = document.getElementById('reactCode').textContent;
+    copyToClipboard(code);
+}
+
+function copyHtmlCode() {
+    const code = document.getElementById('htmlCode').textContent;
+    copyToClipboard(code);
+}
+
+function showEditForm() {
+    const modal = new bootstrap.Modal(document.getElementById('editModal'));
+    modal.show();
+}
+
+document.getElementById('editForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const title = document.getElementById('editTitle').value;
+    const description = document.getElementById('editDescription').value;
+    
+    try {
+        const response = await fetch(`${apiBase}/video/${videoId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getAuthToken()}`
+            },
+            body: JSON.stringify({ title, description })
+        });
+        
+        if (response.ok) {
+            showToast('Video details updated successfully!', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast('Failed to update video details', 'error');
+        }
+    } catch (error) {
+        showToast('Error updating video details', 'error');
+    }
+});
+
+function confirmDelete(videoId, videoTitle) {
+    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    modal.show();
+}
+
+async function checkProgress() {
+    try {
+        const response = await fetch(`${apiBase}/video/progress/${videoId}`, {
+            headers: {
+                'Authorization': `Bearer ${getAuthToken()}`
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.status === 'completed') {
+                showToast('Video processing completed!', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showToast(`Status: ${data.status} (${data.progress}%)`, 'info');
+            }
+        }
+    } catch (error) {
+        showToast('Error checking progress', 'error');
+    }
+}
+
+async function retryProcessing() {
+    showToast('Retry processing is not implemented yet', 'warning');
+}
+
+function getAuthToken() {
+    return document.cookie.split('; ').find(row => row.startsWith('access_token='))?.split('=')[1];
+}
+
+// Hide video when modal is closed
+document.getElementById('previewModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('previewVideo').src = '';
+});
+
+// Auto-refresh for processing videos
+{% if video.status.value in ['processing', 'uploading'] %}
+setInterval(checkProgress, 5000); // Check every 5 seconds
+{% endif %}
+</script>
+{% endblock %}

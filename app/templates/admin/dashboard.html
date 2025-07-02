@@ -1,0 +1,262 @@
+<!-- app/templates/admin/dashboard.html -->
+{% extends "admin/base.html" %}
+
+{% block title %}Dashboard - Video Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </h1>
+            <p class="text-muted">Welcome back, {{ user.username }}!</p>
+        </div>
+        <div class="col-auto">
+            <a href="/admin/upload" class="btn btn-primary">
+                <i class="bi bi-cloud-upload"></i> Upload New Video
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Total Videos
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ stats.total_videos }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-collection-play fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Completed
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ stats.completed_videos }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Processing
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ stats.processing_videos }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-hourglass-split fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Storage Used
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ "%.1f"|format(stats.total_size_mb) }} MB
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-hdd fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Videos -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="bi bi-clock-history"></i> Recent Videos
+                    </h6>
+                    <a href="/admin/videos" class="btn btn-sm btn-outline-primary">
+                        View All <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if recent_videos %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Status</th>
+                                    <th>Size</th>
+                                    <th>Duration</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for video in recent_videos %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-play-circle me-2"></i>
+                                            <div>
+                                                <div class="fw-bold">{{ video.title }}</div>
+                                                <div class="text-muted small">{{ video.original_filename }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if video.status.value == 'completed' %}
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-circle"></i> Completed
+                                            </span>
+                                        {% elif video.status.value == 'processing' %}
+                                            <span class="badge bg-warning">
+                                                <i class="bi bi-hourglass-split"></i> Processing
+                                            </span>
+                                        {% elif video.status.value == 'uploading' %}
+                                            <span class="badge bg-info">
+                                                <i class="bi bi-cloud-upload"></i> Uploading
+                                            </span>
+                                        {% elif video.status.value == 'failed' %}
+                                            <span class="badge bg-danger">
+                                                <i class="bi bi-x-circle"></i> Failed
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if video.file_size %}
+                                            {{ "%.1f"|format(video.file_size / (1024*1024)) }} MB
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if video.duration %}
+                                            {% set hours = video.duration // 3600 %}
+                                            {% set minutes = (video.duration % 3600) // 60 %}
+                                            {% set seconds = video.duration % 60 %}
+                                            {{ "%02d:%02d:%02d"|format(hours, minutes, seconds) }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="text-muted">
+                                            {{ video.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="/admin/video/{{ video.id }}" class="btn btn-outline-primary">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            {% if video.status.value == 'completed' %}
+                                            <button class="btn btn-outline-success" onclick="generateStreamingLink({{ video.id }})">
+                                                <i class="bi bi-link-45deg"></i>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                        <h5 class="mt-2 text-muted">No videos uploaded yet</h5>
+                        <p class="text-muted">Start by uploading your first video!</p>
+                        <a href="/admin/upload" class="btn btn-primary">
+                            <i class="bi bi-cloud-upload"></i> Upload Video
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.border-left-primary { border-left: 0.25rem solid #4e73df !important; }
+.border-left-success { border-left: 0.25rem solid #1cc88a !important; }
+.border-left-warning { border-left: 0.25rem solid #f6c23e !important; }
+.border-left-info { border-left: 0.25rem solid #36b9cc !important; }
+
+.card {
+    border-radius: 10px;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #5a5c69;
+}
+</style>
+
+<script>
+async function generateStreamingLink(videoId) {
+    try {
+        const response = await fetch(`/api/v1/video/${videoId}/generate-token`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getAuthToken()}`
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            navigator.clipboard.writeText(data.streaming_url);
+            showToast('Streaming link copied to clipboard!', 'success');
+        } else {
+            showToast('Failed to generate streaming link', 'error');
+        }
+    } catch (error) {
+        showToast('Error generating streaming link', 'error');
+    }
+}
+
+function getAuthToken() {
+    // In production, you might want to get this from a more secure location
+    return document.cookie.split('; ').find(row => row.startsWith('access_token='))?.split('=')[1];
+}
+</script>
+{% endblock %}
