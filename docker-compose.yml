@@ -31,7 +31,7 @@ services:
       - db
       - redis
     restart: unless-stopped
-    command: celery -A app.celery_app worker --loglevel=debug
+    command: celery -A app.celery_app worker --loglevel=info
     env_file:
       - .env
 

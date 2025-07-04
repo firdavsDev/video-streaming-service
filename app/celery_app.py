@@ -23,11 +23,11 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-    # Task routing
-    task_routes={
-        "app.tasks.video_tasks.process_video": {"queue": "video_processing"},
-        "app.tasks.video_tasks.cleanup_temp_files": {"queue": "cleanup"},
-    },
+    # Remove task_routes to use default 'celery' queue
+    # task_routes={
+    #     "app.tasks.video_tasks.process_video": {"queue": "video_processing"},
+    #     "app.tasks.video_tasks.cleanup_temp_files": {"queue": "cleanup"},
+    # },
     # Task settings
     task_acks_late=True,
     worker_prefetch_multiplier=1,

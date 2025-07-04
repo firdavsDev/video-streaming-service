@@ -4,6 +4,7 @@ from typing import Optional
 
 import aiofiles
 from fastapi import HTTPException, UploadFile, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -220,10 +221,9 @@ class VideoService:
         ).count()
         failed_videos = query.filter(Video.status == VideoStatus.FAILED).count()
 
-        # Calculate total file size
         total_size = (
             query.filter(Video.file_size.isnot(None))
-            .with_entities(self.db.func.sum(Video.file_size))
+            .with_entities(func.sum(Video.file_size))
             .scalar()
             or 0
         )

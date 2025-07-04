@@ -164,12 +164,9 @@ async def delete_video(
 
 @router.get("/stream/{unique_id}")
 async def stream_video(
-    unique_id: str,
-    token: Optional[str] = Query(None),
-    current_user: Optional[User] = Depends(get_current_user_optional),
-    db: Session = Depends(get_db),
+    unique_id: str, token: Optional[str] = Query(None), db: Session = Depends(get_db)
 ):
-    """Stream video with token verification"""
+    """Stream video with token verification (Public endpoint)"""
 
     video_service = VideoService(db)
     video = video_service.get_video_by_unique_id(unique_id)
@@ -194,12 +191,19 @@ async def stream_video(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid video token",
                 )
-        except HTTPException:
-            raise
-    elif not current_user or not current_user.is_admin:
-        # Require token for non-admin users
+        except HTTPException as e:
+            logger.warning(
+                f"Token verification failed for video {video.id}: {e.detail}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired video token",
+            )
+    else:
+        # No token provided - deny access
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Video token required"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Video token required for streaming",
         )
 
     # Check if file exists
@@ -207,6 +211,10 @@ async def stream_video(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Video file not found"
         )
+
+    logger.info(
+        f"Streaming video {video.id} ({video.title}) to user {token_data.get('user_id')}"
+    )
 
     # Stream the video file
     def iterfile(file_path: str):
@@ -219,6 +227,9 @@ async def stream_video(
         headers={
             "Content-Disposition": f"inline; filename={video.original_filename}",
             "Accept-Ranges": "bytes",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
         },
     )
 

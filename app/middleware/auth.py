@@ -40,6 +40,7 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
             "/static",
             "/health",  # Health check
             "/",  # Root path
+            #  "/api/v1/video/stream/", # Video streaming (has own token check)
         ]
 
         if any(path.startswith(skip_path) for skip_path in skip_paths):
