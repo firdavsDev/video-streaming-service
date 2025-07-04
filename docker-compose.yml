@@ -6,7 +6,7 @@ services:
       - "8000:8000"
     volumes:
       - ./app:/app/app
-      - ./.env:/app/.env          # .env faylini mount qilish
+      - ./.env:/app/.env
       - ./uploads:/app/uploads
       - ./videos:/app/videos
       - ./logs:/app/logs
@@ -23,7 +23,7 @@ services:
     container_name: video_streaming_celery
     volumes:
       - ./app:/app/app
-      - ./.env:/app/.env        # Celery uchun ham
+      - ./.env:/app/.env
       - ./uploads:/app/uploads
       - ./videos:/app/videos
       - ./logs:/app/logs
@@ -31,7 +31,7 @@ services:
       - db
       - redis
     restart: unless-stopped
-    command: celery -A celery_app worker --loglevel=info
+    command: celery -A app.celery_app worker --loglevel=debug
     env_file:
       - .env
 
@@ -48,13 +48,29 @@ services:
       - .env
     
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine 
     container_name: video_streaming_redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped
+
+  flower:
+    image: mher/flower
+    container_name: video_streaming_flower
+    restart: always
+    command: celery flower --persistent=True --basic_auth=admin:20020726Da
+    depends_on:
+      - redis
+      - celery
+    env_file:
+      - .env
+    ports:
+      - "5555:5555"
+    volumes:
+      - flower_data:/data
+
 
   # nginx:
   #   image: nginx:alpine
@@ -71,3 +87,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  flower_data:

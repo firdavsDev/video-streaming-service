@@ -6,8 +6,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
 from app.database import SessionLocal
-from app.services.auth_service import AuthService
 from app.utils.security import verify_token
+
+logger = logging.getLogger(__name__)
+
+
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -27,19 +31,26 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
         skip_paths = [
             "/auth/login",
             "/auth/login-json",
+            "/admin/login",  # Admin login page
+            "/admin/logout",  # Admin logout
+            "/admin/debug",  # Debug endpoint
             "/docs",
             "/redoc",
             "/openapi.json",
             "/static",
+            "/health",  # Health check
+            "/",  # Root path
         ]
 
         if any(path.startswith(skip_path) for skip_path in skip_paths):
+            logger.info(f"Skipping authentication for path: {path}")
             return await call_next(request)
 
         # Check if path requires admin access
         if any(
             path.startswith(protected_path) for protected_path in self.protected_paths
         ):
+            logger.info(f"Admin middleware - Protecting path: {path}")
 
             # Get token from header or cookie
             token = None
@@ -53,36 +64,44 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
             if not token:
                 token = request.cookies.get("access_token")
 
+            # Debug logging
+            logger.info(f"Admin middleware - Path: {path}")
+            logger.info(f"Admin middleware - Cookies: {dict(request.cookies)}")
+            logger.info(f"Admin middleware - Token found: {bool(token)}")
+
             if not token:
-                if path.startswith("/admin") and not path.startswith("/admin/login"):
-                    return RedirectResponse(url="/admin/login", status_code=302)
-                else:
-                    raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="Authentication required",
-                    )
+                logger.info("Admin middleware - No token found, redirecting to login")
+                return RedirectResponse(
+                    url="/admin/login", status_code=status.HTTP_302_FOUND
+                )
 
             try:
                 # Verify token
                 payload = verify_token(token)
+                logger.info(f"Admin middleware - Token payload: {payload}")
 
                 # Check if user is admin
                 if not payload.get("is_admin", False):
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Admin access required",
+                    logger.info(
+                        "Admin middleware - User is not admin, redirecting to login"
+                    )
+                    return RedirectResponse(
+                        url="/admin/login", status_code=status.HTTP_302_FOUND
                     )
 
                 # Add user info to request state
                 request.state.user_id = payload.get("user_id")
                 request.state.username = payload.get("sub")
                 request.state.is_admin = payload.get("is_admin", False)
+                logger.info(
+                    f"Admin middleware - User authenticated: {request.state.username}"
+                )
 
             except HTTPException as e:
-                if path.startswith("/admin") and not path.startswith("/admin/login"):
-                    return RedirectResponse(url="/admin/login", status_code=302)
-                else:
-                    raise e
+                logger.error(f"Admin middleware - Token verification failed: {e}")
+                return RedirectResponse(
+                    url="/admin/login", status_code=status.HTTP_302_FOUND
+                )
 
         response = await call_next(request)
         return response

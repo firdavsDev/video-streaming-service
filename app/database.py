@@ -25,7 +25,8 @@ else:
         max_overflow=20,
         pool_pre_ping=True,
         pool_recycle=300,
-        echo=settings.debug,
+        # echo=settings.debug,
+        echo=False,
     )
 
 # Create SessionLocal class

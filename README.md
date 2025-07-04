@@ -50,3 +50,29 @@
 **Next Steps:**
 After you confirm this structure, we'll build the admin interface using a modern framework, creating the video streaming service step-by-step from scratch.
 
+
+## Installation and Setup Instructions
+### Step 1: Create Vertual Environment
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+## Step 2: Create .env file
+Create a `.env` file in the root directory of your project with the following content:
+```bash
+copy .env.example .env
+```
+
+### Step 3: Run Migrations
+```bash
+alembic upgrade head
+```
+
+### Step 4: Start the FastAPI Application
+```bash
+docker-compose up --build
+```
+### Step 5: Access the Admin Interface
+Open your web browser and navigate to `http://localhost:8000/admin` to access the admin interface. Use the credentials you set up in the `.env` file.

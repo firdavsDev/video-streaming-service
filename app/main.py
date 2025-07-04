@@ -40,12 +40,12 @@ async def lifespan(app: FastAPI):
     logger.info("Database initialized")
 
     # Create admin user if it doesn't exist
-    try:
-        from create_admin import create_admin_user
+    # try:
+    #     from create_admin import create_admin_user
 
-        await create_admin_user()
-    except Exception as e:
-        logger.warning(f"Could not create admin user: {e}")
+    #     await create_admin_user()
+    # except Exception as e:
+    #     logger.warning(f"Could not create admin user: {e}")
 
     logger.info("Application startup complete")
 
@@ -75,7 +75,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add authentication middleware
+# Add authentication middleware - IMPORTANT: Add this AFTER CORS
 app.add_middleware(AdminAuthMiddleware, protected_paths=["/admin"])
 
 

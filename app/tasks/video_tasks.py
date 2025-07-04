@@ -8,12 +8,12 @@ from datetime import datetime, timedelta
 from celery import current_task
 from sqlalchemy.orm import Session
 
+from app.celery_app import celery_app
 from app.config import settings
 from app.database import SessionLocal
 from app.models.video import Video, VideoStatus
 from app.utils.helpers import calculate_file_hash, get_file_size
 from app.utils.security import generate_secure_filename
-from celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 

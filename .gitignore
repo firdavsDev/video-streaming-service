@@ -69,3 +69,5 @@ htmlcov/
 
 # Docker
 .dockerignore
+
+flower

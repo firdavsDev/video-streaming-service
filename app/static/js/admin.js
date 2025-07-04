@@ -1,4 +1,3 @@
-// app/static/js/admin.js
 
 // Global variables
 let authToken = null;

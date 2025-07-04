@@ -58,7 +58,9 @@ async def admin_login_submit(
     )
 
     # Redirect to dashboard with token in cookie
-    response = RedirectResponse(url="/admin/dashboard", status_code=302)
+    response = RedirectResponse(
+        url="/admin/dashboard", status_code=status.HTTP_302_FOUND
+    )
     response.set_cookie(
         key="access_token",
         value=access_token,
@@ -66,6 +68,7 @@ async def admin_login_submit(
         httponly=True,
         secure=False,  # Set to True in production with HTTPS
         samesite="lax",
+        path="/",  # Make sure cookie is available for all paths
     )
 
     logger.info(f"Admin '{user.username}' logged in successfully")
@@ -75,18 +78,27 @@ async def admin_login_submit(
 @router.get("/logout")
 async def admin_logout():
     """Admin logout"""
-    response = RedirectResponse(url="/admin/login", status_code=302)
+    response = RedirectResponse(url="/admin/login", status_code=status.HTTP_302_FOUND)
     response.delete_cookie(key="access_token")
     return response
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
-async def admin_dashboard(
-    request: Request,
-    current_admin: User = Depends(get_current_admin_user),
-    db: Session = Depends(get_db),
-):
+async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     """Admin dashboard page"""
+
+    # Get user info from request state (set by middleware)
+    if not hasattr(request.state, "user_id") or not request.state.is_admin:
+        return RedirectResponse(url="/admin/login", status_code=status.HTTP_302_FOUND)
+
+    # Get user from database
+    from app.services.auth_service import AuthService
+
+    auth_service = AuthService(db)
+    current_admin = auth_service.get_user_by_id(request.state.user_id)
+
+    if not current_admin or not current_admin.is_admin:
+        return RedirectResponse(url="/admin/login", status_code=status.HTTP_302_FOUND)
 
     video_service = VideoService(db)
     stats = video_service.get_video_stats(current_admin)
@@ -217,25 +229,38 @@ async def admin_delete_video(
             detail="Video not found or could not be deleted",
         )
 
-    return RedirectResponse(url="/admin/videos", status_code=302)
+    return RedirectResponse(url="/admin/videos", status_code=status.HTTP_302_FOUND)
 
 
-@router.get("/settings", response_class=HTMLResponse)
-async def admin_settings_page(
-    request: Request, current_admin: User = Depends(get_current_admin_user)
-):
-    """Admin settings page"""
-    return templates.TemplateResponse(
-        "admin/settings.html",
-        {
-            "request": request,
-            "title": "Settings",
-            "user": current_admin,
-            "settings": {
-                "max_file_size_mb": settings.max_file_size // (1024 * 1024),
-                "allowed_video_types": settings.allowed_video_types_list,
-                "upload_dir": settings.upload_dir,
-                "video_dir": settings.video_dir,
-            },
-        },
-    )
+@router.get("/dashboard-debug")
+async def debug_dashboard(request: Request):
+    """Debug dashboard route"""
+
+    # Check request state
+    state_info = {
+        "user_id": getattr(request.state, "user_id", None),
+        "username": getattr(request.state, "username", None),
+        "is_admin": getattr(request.state, "is_admin", None),
+    }
+
+    # Check cookies
+    cookies = dict(request.cookies)
+    token = cookies.get("access_token")
+
+    token_info = {}
+    if token:
+        try:
+            from app.utils.security import verify_token
+
+            payload = verify_token(token)
+            token_info = {"valid": True, "payload": payload}
+        except Exception as e:
+            token_info = {"valid": False, "error": str(e)}
+
+    return {
+        "path": request.url.path,
+        "request_state": state_info,
+        "cookies": cookies,
+        "token_info": token_info,
+        "middleware_should_run": True,
+    }
